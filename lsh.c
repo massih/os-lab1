@@ -30,6 +30,8 @@
 void PrintCommand(int, Command *);
 void PrintPgm(Pgm *);
 void stripwhite(char *);
+//added function definitions
+void execute_command(Pgm *);
 
 /* When non-zero, this global means the user is done using this program. */
 int done = 0;
@@ -66,13 +68,24 @@ int main(void)
         add_history(line);
         /* execute it */
         n = parse(line, &cmd);
-        PrintCommand(n, &cmd);
+      	Pgm p = &cmd->pgm;
+
+        // PrintCommand(n, &cmd);
       }
     }
     
+    // if (n != -1)
+    //   {
+    //   	// execute_command(p);
+    //   }  
+
+
     if(line) {
       free(line);
     }
+
+
+
   }
   return 0;
 }
@@ -114,6 +127,7 @@ PrintPgm (Pgm *p)
     PrintPgm(p->next);
     printf("    [");
     while (*pl) {
+    	// execute_command(*pl++);
       printf("%s ", *pl++);
     }
     printf("]\n");
@@ -144,4 +158,16 @@ stripwhite (char *string)
   }
 
   string [++i] = '\0';
+}
+// ===========================Added Function(s)==========================
+
+void execute_command(Pgm *cmds){
+	pid_t child_pid;
+	char **cmd = cmds->pgmlist;
+	child_pid = fork();
+	if(child_pid ==0){
+		printf("Fork Done\n");
+		execvp(*cmd, cmd);
+
+	}
 }
