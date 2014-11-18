@@ -31,7 +31,7 @@ void PrintCommand(int, Command *);
 void PrintPgm(Pgm *);
 void stripwhite(char *);
 //added function definitions
-void execute_command(Pgm *);
+void execute_command(Command *);
 
 /* When non-zero, this global means the user is done using this program. */
 int done = 0;
@@ -68,12 +68,11 @@ int main(void)
         add_history(line);
         /* execute it */
         n = parse(line, &cmd);
-//      	Pgm *p = cmd.pgm;
         if (n != -1)
         {
-            execute_command(cmd.pgm);
+            execute_command(&cmd);
         }
-        PrintCommand(n, &cmd);
+        // PrintCommand(n, &cmd);
       }
     }
     
@@ -155,17 +154,21 @@ stripwhite (char *string)
 }
 // ===========================Added Function(s)==========================
 
-void execute_command(Pgm *cmds){
+void execute_command(Command *cmds){
 	pid_t child_pid;
     int status;
     
-	char **cmd = cmds->pgmlist;
-	child_pid = fork();
-	if(child_pid ==0){
-		printf("Fork Done\n");
+	char **cmd = cmds->pgm->pgmlist;
+	int background = cmds->bakground;
+//	child_pid = fork();
+	if((child_pid = fork()) ==0){
+		// printf("background: %d\n",cmds->bakground);
 		execvp(*cmd, cmd);
 	}
     else {
-        while (wait(&status) != child_pid); // wait for completion
+    	if(!background){
+    		 waitpid(-1,&status,0);// wait for completion
+    	}
+        	
     }
 }
