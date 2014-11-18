@@ -157,17 +157,25 @@ stripwhite (char *string)
 void execute_command(Command *cmds){
 	pid_t child_pid;
     int status;
-    
 	char **cmd = cmds->pgm->pgmlist;
 	int background = cmds->bakground;
-//	child_pid = fork();
-	if((child_pid = fork()) ==0){
-		// printf("background: %d\n",cmds->bakground);
-		execvp(*cmd, cmd);
+	if((child_pid = fork()) == 0){
+		if(execvp(*cmd, cmd) == -1){
+			printf("-lsh: %s : R U kidding?? \n", *cmd);
+			_Exit(EXIT_FAILURE);
+		}
+		
 	}
-    else {
-    	if(!background){
-    		 waitpid(-1,&status,0);// wait for completion
+    else if (child_pid > 0){
+    	if(background == 0){
+    		waitpid(child_pid,&status,0); // wait for completion
+    	}else{
+    		if(child_pid){
+    			printf("pid exists\n");	
+    		}else{
+    			printf("pid doesnt exists\n");	
+    		}
+    		
     	}
         	
     }
