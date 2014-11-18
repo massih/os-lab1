@@ -11,8 +11,6 @@ CC=	gcc
 CFLAGS= -g 
 ## Turn on this for more warnings:
 #CFLAGS= -g -Wall -pedantic
-# Using GNU readline on Mac OS X 
-CPPFLAGS= -I/usr/local/opt/readline/include
 LIBS= -lreadline -ltermcap
 
 .SUFFIXES: .c .o

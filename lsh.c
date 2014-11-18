@@ -1,4 +1,4 @@
-/* 
+    /*
  * Main source code file for lsh shell program
  *
  * You are free to add functions to this file.
@@ -68,24 +68,18 @@ int main(void)
         add_history(line);
         /* execute it */
         n = parse(line, &cmd);
-      	Pgm p = &cmd->pgm;
-
-        // PrintCommand(n, &cmd);
+//      	Pgm *p = cmd.pgm;
+        if (n != -1)
+        {
+            execute_command(cmd.pgm);
+        }
+        PrintCommand(n, &cmd);
       }
     }
     
-    // if (n != -1)
-    //   {
-    //   	// execute_command(p);
-    //   }  
-
-
     if(line) {
       free(line);
     }
-
-
-
   }
   return 0;
 }
@@ -163,11 +157,15 @@ stripwhite (char *string)
 
 void execute_command(Pgm *cmds){
 	pid_t child_pid;
+    int status;
+    
 	char **cmd = cmds->pgmlist;
 	child_pid = fork();
 	if(child_pid ==0){
 		printf("Fork Done\n");
 		execvp(*cmd, cmd);
-
 	}
+    else {
+        while (wait(&status) != child_pid); // wait for completion
+    }
 }
