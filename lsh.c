@@ -32,9 +32,12 @@ void PrintPgm(Pgm *);
 void stripwhite(char *);
 //added function definitions
 void execute_command(Command *);
+void handle_sigchld(int);
 
 /* When non-zero, this global means the user is done using this program. */
 int done = 0;
+
+struct sigaction sa;
 
 /*
  * Name: main
@@ -154,6 +157,10 @@ stripwhite (char *string)
 }
 // ===========================Added Function(s)==========================
 
+void handle_sigchld(int sig) {
+    while (waitpid((pid_t)(-1), 0, WNOHANG) > 0) {}
+}
+
 void execute_command(Command *cmds){
 	pid_t child_pid;
     int status;
@@ -168,7 +175,14 @@ void execute_command(Command *cmds){
 	}
     else if (child_pid > 0){
     	if(background == 0){
-    		waitpid(child_pid,&status,0); // wait for completion
+//    		waitpid(child_pid,&status,0); // wait for completion
+            sa.sa_handler = &handle_sigchld;
+            sigemptyset(&sa.sa_mask);
+            sa.sa_flags = SA_RESTART | SA_NOCLDSTOP;
+            if (sigaction(SIGCHLD, &sa, 0) == -1) {
+                perror(0);
+                exit(1);
+            }
     	}else{
     		if(child_pid){
     			printf("pid exists\n");	
