@@ -22,6 +22,7 @@
 #include <readline/readline.h>
 #include <readline/history.h>
 #include "parse.h"
+#include <signal.h>
 
 /*
  * Function declarations
