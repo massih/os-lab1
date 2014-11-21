@@ -54,7 +54,7 @@ int main(void)
   while (!done) {
 
     char *line;
-    line = readline("> ");
+    line = readline("Dude => ");
 
     if (!line) {
       /* Encountered EOF at top level */
@@ -75,6 +75,7 @@ int main(void)
         if (n != -1)
         {
             execute_command(&cmd);
+            sleep(1);
         }
         // PrintCommand(n, &cmd);
       }
@@ -160,7 +161,7 @@ stripwhite (char *string)
 
 void handle_sigchld(int sig) {
     while (waitpid((pid_t)(-1), 0, WNOHANG) > 0) {}
-}
+    }
 
 void execute_command(Command *cmds){
 	pid_t child_pid;
@@ -185,11 +186,6 @@ void execute_command(Command *cmds){
                 exit(1);
             }
     	}else{
-    		if(child_pid){
-    			printf("pid exists\n");	
-    		}else{
-    			printf("pid doesnt exists\n");	
-    		}
     		
     	}
         	
