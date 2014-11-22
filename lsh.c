@@ -39,6 +39,7 @@ void handle_sigchld(int);
 int done = 0;
 
 struct sigaction sa;
+int pfd[2];
 
 /*
  * Name: main
@@ -74,8 +75,8 @@ int main(void)
         n = parse(line, &cmd);
         if (n != -1)
         {
+        	pipe(pfd);
             execute_command(&cmd);
-            sleep(1);
         }
         // PrintCommand(n, &cmd);
       }
@@ -168,7 +169,13 @@ void execute_command(Command *cmds){
     int status;
 	char **cmd = cmds->pgm->pgmlist;
 	int background = cmds->bakground;
+
+
+
 	if((child_pid = fork()) == 0){
+		close(pfd[0]);
+		dup2(pfd[1],STDOUT_FILENO);
+		close(pfd[1]);
 		if(execvp(*cmd, cmd) == -1){
 			printf("-lsh: %s : R U kidding?? \n", *cmd);
 			_Exit(EXIT_FAILURE);
@@ -176,8 +183,12 @@ void execute_command(Command *cmds){
 		
 	}
     else if (child_pid > 0){
+		close(pfd[1]);
+		dup2(pfd[0],STDIN_FILENO);
+		close(pfd[0]);
+    	printf("RECIEVED %s \n", STDIN_FILENO);
     	if(background == 0){
-//    		waitpid(child_pid,&status,0); // wait for completion
+   		waitpid(child_pid,&status,0); // wait for completion
             sa.sa_handler = &handle_sigchld;
             sigemptyset(&sa.sa_mask);
             sa.sa_flags = SA_RESTART | SA_NOCLDSTOP;
