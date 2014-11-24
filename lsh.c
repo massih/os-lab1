@@ -23,6 +23,7 @@
 #include <readline/history.h>
 #include "parse.h"
 #include <signal.h>
+#include <unistd.h>
 
 /*
  * Function declarations
@@ -32,14 +33,15 @@ void PrintCommand(int, Command *);
 void PrintPgm(Pgm *);
 void stripwhite(char *);
 //added function definitions
-void execute_command(Command *);
+void commandIO(Command *);
+void execute_command(Pgm *, int);
 void handle_sigchld(int);
 
 /* When non-zero, this global means the user is done using this program. */
 int done = 0;
 
 struct sigaction sa;
-int pfd[2];
+
 
 /*
  * Name: main
@@ -75,8 +77,8 @@ int main(void)
         n = parse(line, &cmd);
         if (n != -1)
         {
-        	pipe(pfd);
-            execute_command(&cmd);
+        	commandIO(&cmd);
+            // execute_command(&cmd);
         }
         // PrintCommand(n, &cmd);
       }
@@ -164,31 +166,49 @@ void handle_sigchld(int sig) {
     while (waitpid((pid_t)(-1), 0, WNOHANG) > 0) {}
     }
 
-void execute_command(Command *cmds){
+void commandIO(Command *cmds){
+	int background = cmds->bakground;
+	Pgm *lastCommand = cmds->pgm;
+	execute_command(lastCommand,background);
+}
+
+void execute_command(Pgm *command, int background){
 	pid_t child_pid;
     int status;
-	char **cmd = cmds->pgm->pgmlist;
-	int background = cmds->bakground;
+    int pfd[2];
+	
+	pipe(pfd);
+	char **cmd = command->pgmlist;
 
+	if((child_pid = fork()) == -1){
+		perror("unseccessful fork");
 
-
-	if((child_pid = fork()) == 0){
-		close(pfd[0]);
-		dup2(pfd[1],STDOUT_FILENO);
-		close(pfd[1]);
-		if(execvp(*cmd, cmd) == -1){
-			printf("-lsh: %s : R U kidding?? \n", *cmd);
-			_Exit(EXIT_FAILURE);
+	}else if((child_pid = fork()) == 0){
+		if(command->next != NULL){
+			execute_command(command->next,background);
+		}else{
+			close(pfd[0]);
+			dup2(pfd[1],STDOUT_FILENO);
+			close(pfd[1]);
+			if(execvp(*cmd, cmd) == -1){
+				printf("-lsh: %s : R U kidding?? \n", *cmd);
+				_Exit(EXIT_FAILURE);
+			}
+			
 		}
-		
 	}
     else if (child_pid > 0){
-		close(pfd[1]);
-		dup2(pfd[0],STDIN_FILENO);
-		close(pfd[0]);
-    	printf("RECIEVED %s \n", STDIN_FILENO);
     	if(background == 0){
-   		waitpid(child_pid,&status,0); // wait for completion
+   			waitpid(child_pid,&status,0); // wait for completion
+            char buff[1000];
+            memset(buff,0,sizeof(buff));
+            close(pfd[1]);
+			// dup2(pfd[0],0);
+			// close(0);
+            read(pfd[0],buff,1000);
+			close(pfd[0]);
+    	printf("RECIEVED \n%s \n", buff);
+
             sa.sa_handler = &handle_sigchld;
             sigemptyset(&sa.sa_mask);
             sa.sa_flags = SA_RESTART | SA_NOCLDSTOP;
@@ -196,9 +216,21 @@ void execute_command(Command *cmds){
                 perror(0);
                 exit(1);
             }
+			
     	}else{
-    		
+    	//TODO ******	
     	}
-        	
     }
 }
+
+// Pgm commandFinder(Pgm *cmds){
+// 	Pgm *temp;
+// 	while(cmds->next != NULL){
+// 		temp = cmds->next;
+// 		if(temp->next == NULL){
+
+// 			return
+// 		}
+// 	}
+
+// }
