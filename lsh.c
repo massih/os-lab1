@@ -41,7 +41,6 @@ void handle_sigchld(int);
 
 /* When non-zero, this global means the user is done using this program. */
 int done = 0;
-int pfd[2];
 struct sigaction sa;
 
 
@@ -171,14 +170,19 @@ void handle_sigchld(int sig) {
 void commandIO(Command *cmds){
 	int background = cmds->bakground;
 	Pgm *lastCommand = cmds->pgm;
-	pipe(pfd);
-	execute_command(lastCommand,background);
+	// pipe(pfd);
+	if(fork()==0){
+		execute_command(lastCommand,background);
+	}else{
+		wait(NULL);
+	}
 }
 
 void execute_command(Pgm *command, int background){
+	int pfd[2];
 	pid_t child_pid;
     int status;
-    
+    pipe(pfd);
 	
 	char **cmd = command->pgmlist;
 
@@ -186,54 +190,24 @@ void execute_command(Pgm *command, int background){
 		perror("unseccessful fork");
 
 	}else if(child_pid  == 0){
-		// printf("CHILD command list is %s \n",*cmd);
 		if(command->next != NULL){
 			execute_command(command->next,background);
-			// close(pfd[0]);
-			// dup2(pfd[1],STDOUT_FILENO);
-			// close(pfd[1]);
-			if(execvp(*cmd, cmd) == -1){
-				// printf("-lsh: %s : R U kidding?? \n", *cmd);
-				_Exit(EXIT_FAILURE);
-			}
-		}else{
-			// execute_command(command->next,background);
-			close(pfd[0]);
-			dup2(pfd[1],STDOUT_FILENO);
-			close(pfd[1]);
-			if(execvp(*cmd, cmd) == -1){
-				// printf("-lsh: %s : R U kidding?? \n", *cmd);
-				_Exit(EXIT_FAILURE);
-			}
 		}
-
+		close(pfd[0]);
+		dup2(pfd[1],STDOUT_FILENO);
+		close(pfd[1]);
+		if(execvp(*cmd, cmd) == -1){
+			// printf("-lsh: %s : R U kidding?? \n", *cmd);
+			_Exit(EXIT_FAILURE);
+		}
 	}
     else if (child_pid > 0){
     	// printf("PARENT command list is %s \n",*cmd);
-    	if(command->next != NULL){
-  			waitpid(child_pid,&status,0); // wait for completion
+    	if(background == 0){
+   			waitpid(child_pid,&status,0); // wait for completion
             close(pfd[1]);
 			dup2(pfd[0],STDIN_FILENO);
 			close(pfd[0]);
-			if(execvp(*cmd, cmd) == -1){
-				// printf("-lsh: %s : R U kidding?? \n", *cmd);
-				_Exit(EXIT_FAILURE);
-			}
-    	}
-    	else{
- 			waitpid(child_pid,&status,0); // wait for completion
-   //          close(pfd[1]);
-			// dup2(pfd[0],STDIN_FILENO);
-			// close(pfd[0]);
-		}
-    	if(background == 0){
-   			waitpid(child_pid,&status,0); // wait for completion
-            // char buff[1000];
-            // memset(buff,0,sizeof(buff));
-			// close(0);
-   //          read(pfd[0],buff,1000);
-    		// printf("RECIEVED \n%s \n", buff);
-
             sa.sa_handler = &handle_sigchld;
             sigemptyset(&sa.sa_mask);
             sa.sa_flags = SA_RESTART | SA_NOCLDSTOP;
@@ -241,21 +215,33 @@ void execute_command(Pgm *command, int background){
                 perror("SIGCHLD PROBLEM");
                 exit(1);
             }
-			
+    //       	if(command->next != NULL){
+				// if(execvp(cmd[0], cmd) == -1){
+				// 	// printf("-lsh: %s : R U kidding?? \n", *cmd);
+				// 	_Exit(EXIT_FAILURE);
+				// }
+    //       	 }
+  
+
+
     	}else{
     	//TODO ******	
     	}
+  //   	 if(command->next != NULL){
+  // 			waitpid(child_pid,&status,0); // wait for completion
+  //           close(pfd[1]);
+		// 	dup2(pfd[0],STDIN_FILENO);
+		// 	close(pfd[0]);
+		// 	if(execvp(*cmd, cmd) == -1){
+		// 		// printf("-lsh: %s : R U kidding?? \n", *cmd);
+		// 		_Exit(EXIT_FAILURE);
+		// 	}
+  //   	}
+  //   	else{
+ 	// 		waitpid(child_pid,&status,0); // wait for completion
+  //  //          close(pfd[1]);
+		// 	// dup2(pfd[0],STDIN_FILENO);
+		// 	// close(pfd[0]);
+		// }
     }
 }
-
-// Pgm commandFinder(Pgm *cmds){
-// 	Pgm *temp;
-// 	while(cmds->next != NULL){
-// 		temp = cmds->next;
-// 		if(temp->next == NULL){
-
-// 			return
-// 		}
-// 	}
-
-// }
