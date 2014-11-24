@@ -186,29 +186,50 @@ void execute_command(Pgm *command, int background){
 		perror("unseccessful fork");
 
 	}else if(child_pid  == 0){
-		// printf("command list is %s \n",*cmd);
+		// printf("CHILD command list is %s \n",*cmd);
 		if(command->next != NULL){
 			execute_command(command->next,background);
-		}else{
-			close(pfd[0]);
-			dup2(pfd[1],STDOUT_FILENO);
-			close(pfd[1]);
-
+			// close(pfd[0]);
+			// dup2(pfd[1],STDOUT_FILENO);
+			// close(pfd[1]);
 			if(execvp(*cmd, cmd) == -1){
 				// printf("-lsh: %s : R U kidding?? \n", *cmd);
 				_Exit(EXIT_FAILURE);
 			}
-			
+		}else{
+			// execute_command(command->next,background);
+			close(pfd[0]);
+			dup2(pfd[1],STDOUT_FILENO);
+			close(pfd[1]);
+			if(execvp(*cmd, cmd) == -1){
+				// printf("-lsh: %s : R U kidding?? \n", *cmd);
+				_Exit(EXIT_FAILURE);
+			}
 		}
+
 	}
     else if (child_pid > 0){
+    	// printf("PARENT command list is %s \n",*cmd);
+    	if(command->next != NULL){
+  			waitpid(child_pid,&status,0); // wait for completion
+            close(pfd[1]);
+			dup2(pfd[0],STDIN_FILENO);
+			close(pfd[0]);
+			if(execvp(*cmd, cmd) == -1){
+				// printf("-lsh: %s : R U kidding?? \n", *cmd);
+				_Exit(EXIT_FAILURE);
+			}
+    	}
+    	else{
+ 			waitpid(child_pid,&status,0); // wait for completion
+   //          close(pfd[1]);
+			// dup2(pfd[0],STDIN_FILENO);
+			// close(pfd[0]);
+		}
     	if(background == 0){
    			waitpid(child_pid,&status,0); // wait for completion
             // char buff[1000];
             // memset(buff,0,sizeof(buff));
-            close(pfd[1]);
-			dup2(pfd[0],STDIN_FILENO);
-			close(pfd[0]);
 			// close(0);
    //          read(pfd[0],buff,1000);
     		// printf("RECIEVED \n%s \n", buff);
