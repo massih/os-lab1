@@ -24,6 +24,8 @@
 #include "parse.h"
 #include <signal.h>
 #include <unistd.h>
+#include <stdbool.h>
+
 
 /*
  * Function declarations
@@ -39,7 +41,7 @@ void handle_sigchld(int);
 
 /* When non-zero, this global means the user is done using this program. */
 int done = 0;
-
+int pfd[2];
 struct sigaction sa;
 
 
@@ -169,29 +171,31 @@ void handle_sigchld(int sig) {
 void commandIO(Command *cmds){
 	int background = cmds->bakground;
 	Pgm *lastCommand = cmds->pgm;
+	pipe(pfd);
 	execute_command(lastCommand,background);
 }
 
 void execute_command(Pgm *command, int background){
 	pid_t child_pid;
     int status;
-    int pfd[2];
+    
 	
-	pipe(pfd);
 	char **cmd = command->pgmlist;
 
 	if((child_pid = fork()) == -1){
 		perror("unseccessful fork");
 
-	}else if((child_pid = fork()) == 0){
+	}else if(child_pid  == 0){
+		// printf("command list is %s \n",*cmd);
 		if(command->next != NULL){
 			execute_command(command->next,background);
 		}else{
 			close(pfd[0]);
 			dup2(pfd[1],STDOUT_FILENO);
 			close(pfd[1]);
+
 			if(execvp(*cmd, cmd) == -1){
-				printf("-lsh: %s : R U kidding?? \n", *cmd);
+				// printf("-lsh: %s : R U kidding?? \n", *cmd);
 				_Exit(EXIT_FAILURE);
 			}
 			
@@ -200,20 +204,20 @@ void execute_command(Pgm *command, int background){
     else if (child_pid > 0){
     	if(background == 0){
    			waitpid(child_pid,&status,0); // wait for completion
-            char buff[1000];
-            memset(buff,0,sizeof(buff));
+            // char buff[1000];
+            // memset(buff,0,sizeof(buff));
             close(pfd[1]);
-			// dup2(pfd[0],0);
-			// close(0);
-            read(pfd[0],buff,1000);
+			dup2(pfd[0],STDIN_FILENO);
 			close(pfd[0]);
-    	printf("RECIEVED \n%s \n", buff);
+			// close(0);
+   //          read(pfd[0],buff,1000);
+    		// printf("RECIEVED \n%s \n", buff);
 
             sa.sa_handler = &handle_sigchld;
             sigemptyset(&sa.sa_mask);
             sa.sa_flags = SA_RESTART | SA_NOCLDSTOP;
             if (sigaction(SIGCHLD, &sa, 0) == -1) {
-                perror(0);
+                perror("SIGCHLD PROBLEM");
                 exit(1);
             }
 			
