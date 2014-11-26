@@ -36,7 +36,7 @@ void PrintPgm(Pgm *);
 void stripwhite(char *);
 //added function definitions
 void commandIO(Command *);
-void execute_command(Pgm *, int);
+void execute_command(Pgm *, int *);
 void handle_sigchld(int);
 
 /* When non-zero, this global means the user is done using this program. */
@@ -171,19 +171,6 @@ void handle_sigchld(int sig) {
 void commandIO(Command *cmds){
 	int background = cmds->bakground;
 	Pgm *lastCommand = cmds->pgm;
-<<<<<<< HEAD
-	// pipe(pfd);
-	if(fork()==0){
-		execute_command(lastCommand,&background);
-	}else{
-		wait(NULL);
-	}
-}
-
-void execute_command(Pgm *command, int* background){
-	int pfd[2];
-	pid_t child_pid;
-=======
     char **cmd = cmds->pgm->pgmlist;
     
     pid_t parent;
@@ -193,26 +180,26 @@ void execute_command(Pgm *command, int* background){
     }
     else if(parent == 0){
         if (cmds->pgm->next != 0) {
-            execute_command(lastCommand,background);
+            execute_command(lastCommand,&background);
         }else{
             if(execvp(cmd[0], cmd) == -1){
-                printf("-lsh: %s : R U kidding?? \n", *cmd);
+                // printf("-lsh: %s : R U kidding?? \n", *cmd);
                 _Exit(EXIT_FAILURE);
-                return;
             }
-            return;
         }
     }else{
+    	if(!background){
         wait(NULL);
-        return;
+    	}else{
+
+    	}
     }
     
 }
 
-void execute_command(Pgm *command, int background){
+void execute_command(Pgm *command, int *background){
     char **cmd = command->pgmlist;
     int pfd[2];
->>>>>>> 10ed4cf3d1b8481355bc9c2ec595983ec892cbfc
     int status;
     pid_t child_pid;
     pipe(pfd);
@@ -229,15 +216,9 @@ void execute_command(Pgm *command, int background){
         if (command->next != NULL) {
             execute_command(command->next,background);
         }
-//        else{
-//            if(execvp(cmd[0], cmd) == -1){
-//                printf("-lsh: %s : R U kidding?? \n", *cmd);
-//                _Exit(EXIT_FAILURE);
-//                return;
-//            }
-//        }
     }
     else{  // Parent Process
+
         if (background == 0) {
             close(pfd[1]);
             dup2(pfd[0], STDIN_FILENO);
@@ -247,11 +228,10 @@ void execute_command(Pgm *command, int background){
                 _Exit(EXIT_FAILURE);
                 return;
             }
-            waitpid(child_pid,NULL,0);
+            // waitpid(child_pid,NULL,0);
         }else{
             
         }
-
     }
 }
 
