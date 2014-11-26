@@ -179,19 +179,19 @@ void commandIO(Command *cmds){
         perror("unsuccesful forking");
     }
     else if(parent == 0){
-        if (cmds->pgm->next != 0) {
+        if (cmds->pgm->next != NULL) {
             execute_command(lastCommand,background);
         }else{
             if(execvp(cmd[0], cmd) == -1){
                 printf("-lsh: %s : R U kidding?? \n", *cmd);
                 _Exit(EXIT_FAILURE);
-                return;
             }
-            return;
         }
-    }else{
-        wait(NULL);
-        return;
+    }
+    else{
+        if (background == 0){
+            wait(NULL);
+        }
     }
     
 }
@@ -215,13 +215,13 @@ void execute_command(Pgm *command, int background){
         if (command->next != NULL) {
             execute_command(command->next,background);
         }
-//        else{
-//            if(execvp(cmd[0], cmd) == -1){
-//                printf("-lsh: %s : R U kidding?? \n", *cmd);
-//                _Exit(EXIT_FAILURE);
-//                return;
-//            }
-//        }
+        else{
+            if(execvp(cmd[0], cmd) == -1){
+                printf("-lsh: %s : R U kidding?? \n", *cmd);
+                _Exit(EXIT_FAILURE);
+            }
+        }
+        wait(NULL);
     }
     else{  // Parent Process
         if (background == 0) {
@@ -231,13 +231,11 @@ void execute_command(Pgm *command, int background){
             if(execvp(cmd[0], cmd) == -1){
                 printf("-lsh: %s : R U kidding?? \n", *cmd);
                 _Exit(EXIT_FAILURE);
-                return;
             }
             waitpid(child_pid,NULL,0);
         }else{
-            
-        }
 
+        }
     }
 }
 
