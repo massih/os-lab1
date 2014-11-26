@@ -76,6 +76,7 @@ int main(void)
         add_history(line);
         /* execute it */
         n = parse(line, &cmd);
+//        commandIO(&cmd);
         if (n != -1)
         {
         	commandIO(&cmd);
@@ -165,83 +166,145 @@ stripwhite (char *string)
 
 void handle_sigchld(int sig) {
     while (waitpid((pid_t)(-1), 0, WNOHANG) > 0) {}
-    }
+}
 
 void commandIO(Command *cmds){
 	int background = cmds->bakground;
 	Pgm *lastCommand = cmds->pgm;
-	// pipe(pfd);
-	if(fork()==0){
-		execute_command(lastCommand,background);
-	}else{
-		wait(NULL);
-	}
+    char **cmd = cmds->pgm->pgmlist;
+    
+    pid_t parent;
+    parent = fork();
+    if (parent < 0){
+        perror("unsuccesful forking");
+    }
+    else if(parent == 0){
+        if (cmds->pgm->next != 0) {
+            execute_command(lastCommand,background);
+        }else{
+            if(execvp(cmd[0], cmd) == -1){
+                printf("-lsh: %s : R U kidding?? \n", *cmd);
+                _Exit(EXIT_FAILURE);
+                return;
+            }
+            return;
+        }
+    }else{
+        wait(NULL);
+        return;
+    }
+    
 }
 
 void execute_command(Pgm *command, int background){
-	int pfd[2];
-	pid_t child_pid;
+    char **cmd = command->pgmlist;
+    int pfd[2];
     int status;
+    pid_t child_pid;
     pipe(pfd);
-	
-	char **cmd = command->pgmlist;
-
-	if((child_pid = fork()) == -1){
-		perror("unseccessful fork");
-
-	}else if(child_pid  == 0){
-		if(command->next != NULL){
-			execute_command(command->next,background);
-		}
-		close(pfd[0]);
-		dup2(pfd[1],STDOUT_FILENO);
-		close(pfd[1]);
-		if(execvp(*cmd, cmd) == -1){
-			// printf("-lsh: %s : R U kidding?? \n", *cmd);
-			_Exit(EXIT_FAILURE);
-		}
-	}
-    else if (child_pid > 0){
-    	// printf("PARENT command list is %s \n",*cmd);
-    	if(background == 0){
-   			waitpid(child_pid,&status,0); // wait for completion
+    child_pid = fork();
+    
+    if (child_pid < 0){
+        perror("unsuccesful forking");
+    }
+    // Child Process
+    else if (child_pid == 0) {
+        close(pfd[0]);
+        dup2(pfd[1], STDOUT_FILENO);
+        close(pfd[1]);
+        if (command->next != NULL) {
+            execute_command(command->next,background);
+        }
+//        else{
+//            if(execvp(cmd[0], cmd) == -1){
+//                printf("-lsh: %s : R U kidding?? \n", *cmd);
+//                _Exit(EXIT_FAILURE);
+//                return;
+//            }
+//        }
+    }
+    else{  // Parent Process
+        if (background == 0) {
             close(pfd[1]);
-			dup2(pfd[0],STDIN_FILENO);
-			close(pfd[0]);
-            sa.sa_handler = &handle_sigchld;
-            sigemptyset(&sa.sa_mask);
-            sa.sa_flags = SA_RESTART | SA_NOCLDSTOP;
-            if (sigaction(SIGCHLD, &sa, 0) == -1) {
-                perror("SIGCHLD PROBLEM");
-                exit(1);
+            dup2(pfd[0], STDIN_FILENO);
+            close(pfd[0]);
+            if(execvp(cmd[0], cmd) == -1){
+                printf("-lsh: %s : R U kidding?? \n", *cmd);
+                _Exit(EXIT_FAILURE);
+                return;
             }
-    //       	if(command->next != NULL){
-				// if(execvp(cmd[0], cmd) == -1){
-				// 	// printf("-lsh: %s : R U kidding?? \n", *cmd);
-				// 	_Exit(EXIT_FAILURE);
-				// }
-    //       	 }
-  
+            waitpid(child_pid,NULL,0);
+        }else{
+            
+        }
 
-
-    	}else{
-    	//TODO ******	
-    	}
-  //   	 if(command->next != NULL){
-  // 			waitpid(child_pid,&status,0); // wait for completion
-  //           close(pfd[1]);
-		// 	dup2(pfd[0],STDIN_FILENO);
-		// 	close(pfd[0]);
-		// 	if(execvp(*cmd, cmd) == -1){
-		// 		// printf("-lsh: %s : R U kidding?? \n", *cmd);
-		// 		_Exit(EXIT_FAILURE);
-		// 	}
-  //   	}
-  //   	else{
- 	// 		waitpid(child_pid,&status,0); // wait for completion
-  //  //          close(pfd[1]);
-		// 	// dup2(pfd[0],STDIN_FILENO);
-		// 	// close(pfd[0]);
-		// }
     }
 }
+
+//void execute_command(Pgm *command, int background){
+//	int pfd[2];
+//	pid_t child_pid;
+//    int status;
+//    pipe(pfd);
+//	
+//	char **cmd = command->pgmlist;
+//
+//	if((child_pid = fork()) == -1){
+//		perror("unseccessful fork");
+//
+//	}else if(child_pid  == 0){
+//		if(command->next != NULL){
+//
+//		}
+//		close(pfd[0]);
+//		dup2(pfd[1],STDOUT_FILENO);
+//		close(pfd[1]);
+//		if(execvp(*cmd, cmd) == -1){
+//			// printf("-lsh: %s : R U kidding?? \n", *cmd);
+//			_Exit(EXIT_FAILURE);
+//		}
+//	}
+//    else if (child_pid > 0){
+//    	// printf("PARENT command list is %s \n",*cmd);
+//    	if(background == 0){
+//   			waitpid(child_pid,&status,0); // wait for completion
+//            close(pfd[1]);
+//			dup2(pfd[0],STDIN_FILENO);
+//			close(pfd[0]);
+//            sa.sa_handler = &handle_sigchld;
+//            sigemptyset(&sa.sa_mask);
+//            sa.sa_flags = SA_RESTART | SA_NOCLDSTOP;
+//            if (sigaction(SIGCHLD, &sa, 0) == -1) {
+//                perror("SIGCHLD PROBLEM");
+//                exit(1);
+//            }
+//    //       	if(command->next != NULL){
+//				// if(execvp(cmd[0], cmd) == -1){
+//				// 	// printf("-lsh: %s : R U kidding?? \n", *cmd);
+//				// 	_Exit(EXIT_FAILURE);
+//				// }
+//    //       	 }
+//  
+//
+//
+//    	}else{
+//    	//TODO ******	
+//    	}
+//  //   	 if(command->next != NULL){
+//  // 			waitpid(child_pid,&status,0); // wait for completion
+//  //           close(pfd[1]);
+//		// 	dup2(pfd[0],STDIN_FILENO);
+//		// 	close(pfd[0]);
+//		// 	if(execvp(*cmd, cmd) == -1){
+//		// 		// printf("-lsh: %s : R U kidding?? \n", *cmd);
+//		// 		_Exit(EXIT_FAILURE);
+//		// 	}
+//  //   	}
+//  //   	else{
+// 	// 		waitpid(child_pid,&status,0); // wait for completion
+//  //  //          close(pfd[1]);
+//		// 	// dup2(pfd[0],STDIN_FILENO);
+//		// 	// close(pfd[0]);
+//		// }
+//    }
+//}
