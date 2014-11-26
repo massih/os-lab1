@@ -172,13 +172,13 @@ void commandIO(Command *cmds){
 	Pgm *lastCommand = cmds->pgm;
 	// pipe(pfd);
 	if(fork()==0){
-		execute_command(lastCommand,background);
+		execute_command(lastCommand,&background);
 	}else{
 		wait(NULL);
 	}
 }
 
-void execute_command(Pgm *command, int background){
+void execute_command(Pgm *command, int* background){
 	int pfd[2];
 	pid_t child_pid;
     int status;
