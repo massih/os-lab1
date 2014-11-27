@@ -36,9 +36,9 @@ void PrintPgm(Pgm *);
 void stripwhite(char *);
 //added function definitions
 void commandIO(Command *);
-void execute_command(Pgm *, int);
+void execute_command(Pgm *, int, char *, char *);
 void handle_sigchld(int);
-
+int redirectIO(char *,char *);
 /* When non-zero, this global means the user is done using this program. */
 int done = 0;
 struct sigaction sa;
@@ -172,16 +172,35 @@ void commandIO(Command *cmds){
 	int background = cmds->bakground;
 	Pgm *lastCommand = cmds->pgm;
     char **cmd = cmds->pgm->pgmlist;
-    
+    char *rstdout = cmds->rstdout;
+    char *rstdin = cmds->rstdin;
     pid_t parent;
+
     parent = fork();
     if (parent < 0){
         perror("unsuccesful forking");
     }
     else if(parent == 0){
         if (cmds->pgm->next != NULL) {
-            execute_command(lastCommand,background);
+            execute_command(lastCommand,background,rstdout, rstdin);
         }else{
+		    if(rstdout){
+	        	FILE *fp;
+	        	fp = freopen (rstdout, "w", stdout);
+	        	if(fp == NULL){
+	        		perror("could not create file");
+	        		_Exit(EXIT_FAILURE);
+	        	}
+	    	}
+	    	if(rstdin){
+	        	FILE *fp;
+	        	fp = freopen (rstdin, "r", stdin);
+	        	if(fp == NULL){
+	        		perror("could not create file");
+	        		_Exit(EXIT_FAILURE);
+	        	}
+	        	// fclose(fp);
+	    	}	
             if(execvp(cmd[0], cmd) == -1){
                 printf("-lsh: %s : R U kidding?? \n", *cmd);
                 _Exit(EXIT_FAILURE);
@@ -196,7 +215,7 @@ void commandIO(Command *cmds){
     
 }
 
-void execute_command(Pgm *command, int background){
+void execute_command(Pgm *command, int background,char *rstdout,char *rstdin){
     char **cmd = command->pgmlist;
     int pfd[2];
     int status;
@@ -213,9 +232,17 @@ void execute_command(Pgm *command, int background){
         dup2(pfd[1], STDOUT_FILENO);
         close(pfd[1]);
         if (command->next != NULL) {
-            execute_command(command->next,background);
+            execute_command(command->next,background,rstdout, rstdin);
         }
         else{
+        	if(rstdin){
+	        	FILE *fp;
+	        	fp = freopen (rstdin, "r", stdin);
+	        	if(fp == NULL){
+	        		perror("There is no such a file or directory");
+	        		_Exit(EXIT_FAILURE);
+	        	}
+		    }
             if(execvp(cmd[0], cmd) == -1){
                 printf("-lsh: %s : R U kidding?? \n", *cmd);
                 _Exit(EXIT_FAILURE);
@@ -227,6 +254,17 @@ void execute_command(Pgm *command, int background){
             close(pfd[1]);
             dup2(pfd[0], STDIN_FILENO);
             close(pfd[0]);
+        	if(rstdout){
+	        	FILE *fp;
+	        	fp = freopen (rstdout, "w", stdout);
+	        	if(fp == NULL){
+	        		perror("Could not create file");
+	        		_Exit(EXIT_FAILURE);
+	        	}
+	        	// fclose(fp);
+	    	}
+
+
             if(execvp(cmd[0], cmd) == -1){
                 printf("-lsh: %s : R U kidding?? \n", *cmd);
                 _Exit(EXIT_FAILURE);
@@ -236,6 +274,10 @@ void execute_command(Pgm *command, int background){
 
         }
     }
+}
+
+int redirectIO(char *stdout,char *stdin){
+	return 0;
 }
 
 //void execute_command(Pgm *command, int background){
