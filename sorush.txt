@@ -1,0 +1,10 @@
+Makefile
+Makefile copy
+lsh
+lsh.c
+lsh.o
+parse.c
+parse.h
+parse.o
+sorush.txt
+test.c

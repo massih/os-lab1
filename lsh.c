@@ -56,10 +56,17 @@ int main(void)
   int n;
 
   while (!done) {
-
-    char *line;
-    line = readline("Dude => ");
-
+      char* cwd;
+      char buff[1024];
+      
+      cwd = getcwd( buff, sizeof(buff));
+      
+      char *line;
+      char *token;
+      printf("%s",cwd);
+      line = readline(": Dude => ");
+      char *arr[5];
+      int m = 0;
     if (!line) {
       /* Encountered EOF at top level */
       done = 1;
@@ -74,6 +81,18 @@ int main(void)
 
       if(*line) {
         add_history(line);
+          arr[m]=strtok(line, " ");
+          while(arr[m] && m<4){
+              
+              arr[++m]=strtok(NULL, " ");
+              
+          }
+
+        if(strcmp(arr[0],"cd") == 0){
+            chdir(arr[1]);
+        }else if(strcmp(arr[0],"exit") == 0){
+            exit(0);
+        }
         /* execute it */
         n = parse(line, &cmd);
 //        commandIO(&cmd);
@@ -279,71 +298,3 @@ void execute_command(Pgm *command, int background,char *rstdout,char *rstdin){
 int redirectIO(char *stdout,char *stdin){
 	return 0;
 }
-
-//void execute_command(Pgm *command, int background){
-//	int pfd[2];
-//	pid_t child_pid;
-//    int status;
-//    pipe(pfd);
-//	
-//	char **cmd = command->pgmlist;
-//
-//	if((child_pid = fork()) == -1){
-//		perror("unseccessful fork");
-//
-//	}else if(child_pid  == 0){
-//		if(command->next != NULL){
-//
-//		}
-//		close(pfd[0]);
-//		dup2(pfd[1],STDOUT_FILENO);
-//		close(pfd[1]);
-//		if(execvp(*cmd, cmd) == -1){
-//			// printf("-lsh: %s : R U kidding?? \n", *cmd);
-//			_Exit(EXIT_FAILURE);
-//		}
-//	}
-//    else if (child_pid > 0){
-//    	// printf("PARENT command list is %s \n",*cmd);
-//    	if(background == 0){
-//   			waitpid(child_pid,&status,0); // wait for completion
-//            close(pfd[1]);
-//			dup2(pfd[0],STDIN_FILENO);
-//			close(pfd[0]);
-//            sa.sa_handler = &handle_sigchld;
-//            sigemptyset(&sa.sa_mask);
-//            sa.sa_flags = SA_RESTART | SA_NOCLDSTOP;
-//            if (sigaction(SIGCHLD, &sa, 0) == -1) {
-//                perror("SIGCHLD PROBLEM");
-//                exit(1);
-//            }
-//    //       	if(command->next != NULL){
-//				// if(execvp(cmd[0], cmd) == -1){
-//				// 	// printf("-lsh: %s : R U kidding?? \n", *cmd);
-//				// 	_Exit(EXIT_FAILURE);
-//				// }
-//    //       	 }
-//  
-//
-//
-//    	}else{
-//    	//TODO ******	
-//    	}
-//  //   	 if(command->next != NULL){
-//  // 			waitpid(child_pid,&status,0); // wait for completion
-//  //           close(pfd[1]);
-//		// 	dup2(pfd[0],STDIN_FILENO);
-//		// 	close(pfd[0]);
-//		// 	if(execvp(*cmd, cmd) == -1){
-//		// 		// printf("-lsh: %s : R U kidding?? \n", *cmd);
-//		// 		_Exit(EXIT_FAILURE);
-//		// 	}
-//  //   	}
-//  //   	else{
-// 	// 		waitpid(child_pid,&status,0); // wait for completion
-//  //  //          close(pfd[1]);
-//		// 	// dup2(pfd[0],STDIN_FILENO);
-//		// 	// close(pfd[0]);
-//		// }
-//    }
-//}
