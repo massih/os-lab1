@@ -26,7 +26,6 @@
 #include <unistd.h>
 #include <stdbool.h>
 
-
 /*
  * Function declarations
  */
@@ -34,15 +33,18 @@
 void PrintCommand(int, Command *);
 void PrintPgm(Pgm *);
 void stripwhite(char *);
+
 //added function definitions
-void commandIO(Command *);
+void command_handler(Command *);
 void execute_command(Pgm *, int, char *, char *);
-void handle_sigchld(int);
-int redirectIO(char *,char *);
+void sig_handler(int);
+
 /* When non-zero, this global means the user is done using this program. */
 int done = 0;
-struct sigaction sa;
 
+// Added Global variables
+pid_t mainParent;
+int background;
 
 /*
  * Name: main
@@ -50,66 +52,76 @@ struct sigaction sa;
  * Description: Gets the ball rolling...
  *
  */
-int main(void)
-{
-  Command cmd;
-  int n;
-
-  while (!done) {
-      char* cwd;
-      char buff[1024];
-      
-      cwd = getcwd( buff, sizeof(buff));
-      
-      char *line;
-      char *token;
-      printf("%s",cwd);
-      line = readline(": Dude => ");
-      char *arr[5];
-      int m = 0;
-    if (!line) {
-      /* Encountered EOF at top level */
-      done = 1;
-    }
-    else {
-      /*
-       * Remove leading and trailing whitespace from the line
-       * Then, if there is anything left, add it to the history list
-       * and execute it.
-       */
-      stripwhite(line);
-
-      if(*line) {
-        add_history(line);
-          arr[m]=strtok(line, " ");
-          while(arr[m] && m<4){
-              
-              arr[++m]=strtok(NULL, " ");
-              
-          }
-
-        if(strcmp(arr[0],"cd") == 0){
-            chdir(arr[1]);
-        }else if(strcmp(arr[0],"exit") == 0){
-            exit(0);
-        }
-        /* execute it */
-        n = parse(line, &cmd);
-//        commandIO(&cmd);
-        if (n != -1)
-        {
-        	commandIO(&cmd);
-            // execute_command(&cmd);
-        }
-        // PrintCommand(n, &cmd);
-      }
-    }
+int main(void){
     
-    if(line) {
-      free(line);
+    Command cmd;
+    int n;
+    mainParent = getpid();
+    char buff[1024];
+    
+    // signal(SIGINT, sig_handler);
+    signal(SIGCHLD,sig_handler);
+
+    while (!done) {
+        char* cwd;
+        
+        // Get the current working directoru
+        cwd = getcwd( buff, sizeof(buff));
+        char *line_dir;
+        char *line;
+        char *token;
+        char *arr[5];
+        int m = 0;
+        
+        line = readline(strcat(cwd,": lsh$ "));
+        
+        if (!line) {
+            /* Encountered EOF at top level */
+            done = 1;
+        }
+        else {
+            /*
+                * Remove leading and trailing whitespace from the line
+                * Then, if there is anything left, add it to the history list
+                * and execute it.
+                */
+            stripwhite(line);
+
+            if(*line) {
+                add_history(line);
+                // Duplicate line to process it for built_in commands
+                line_dir = strdup(line);
+                // Tokenizing the line_dir
+                arr[m]=strtok(line_dir, " ");
+                // Loop over the tokenized strings
+                while(arr[m] && m<4){
+                    arr[++m]=strtok(NULL, " ");
+                }
+                
+                
+                n = parse(line, &cmd);
+                if (n != -1){
+                    // Check if change directory ("cd") is requested
+                    if(strcmp(arr[0],"cd") == 0){
+                        // Change the directory
+                        chdir(arr[1]);
+                    }
+                    // Check if exit command is requested
+                    else if(strcmp(arr[0],"exit") == 0){
+                        exit(0);
+                    }else
+                        /* execute it */
+                        command_handler(&cmd);
+                }
+                //         PrintCommand(n, &cmd);
+            }
+        }
+    
+        if(line) {
+            free(line);
+        }
     }
-  }
-  return 0;
+    return 0;
 }
 
 /*
@@ -183,118 +195,152 @@ stripwhite (char *string)
 }
 // ===========================Added Function(s)==========================
 
-void handle_sigchld(int sig) {
-    while (waitpid((pid_t)(-1), 0, WNOHANG) > 0) {}
-}
-
-void commandIO(Command *cmds){
-	int background = cmds->bakground;
+/*
+ * Name: command_handler
+ *
+ * Description: Check all properties of command such as background, etc...
+ * then call execute_command function to execute it.
+ *
+ */
+void command_handler(Command *cmds){
+	background = cmds->bakground;
 	Pgm *lastCommand = cmds->pgm;
     char **cmd = cmds->pgm->pgmlist;
     char *rstdout = cmds->rstdout;
     char *rstdin = cmds->rstdin;
     pid_t parent;
+  
 
     parent = fork();
     if (parent < 0){
         perror("unsuccesful forking");
     }
     else if(parent == 0){
-        if (cmds->pgm->next != NULL) {
-            execute_command(lastCommand,background,rstdout, rstdin);
-        }else{
-		    if(rstdout){
-	        	FILE *fp;
-	        	fp = freopen (rstdout, "w", stdout);
-	        	if(fp == NULL){
-	        		perror("could not create file");
-	        		_Exit(EXIT_FAILURE);
-	        	}
-	    	}
-	    	if(rstdin){
-	        	FILE *fp;
-	        	fp = freopen (rstdin, "r", stdin);
-	        	if(fp == NULL){
-	        		perror("could not create file");
-	        		_Exit(EXIT_FAILURE);
-	        	}
-	        	// fclose(fp);
-	    	}	
-            if(execvp(cmd[0], cmd) == -1){
-                printf("-lsh: %s : R U kidding?? \n", *cmd);
+
+        FILE* infile;
+        FILE* outfile;
+        if(rstdout){
+            outfile = freopen (rstdout, "w", stdout);
+            if(outfile == NULL){
+                perror("could not create file");
                 _Exit(EXIT_FAILURE);
             }
+        }
+        if(rstdin){
+            infile = freopen (rstdin, "r", stdin);
+            if(infile == NULL){
+                perror("could not create file");
+                _Exit(EXIT_FAILURE);
+            }
+        }
+        if(background == 1){
+        	signal(SIGINT, SIG_IGN);
+        }else{
+        	signal(SIGINT, sig_handler);
+        }
+        execute_command(lastCommand,background,rstdout, rstdin);
+        
+        if (infile != NULL){
+            fclose(infile);
+        }
+        if (outfile != NULL){
+            fclose(outfile);
         }
     }
     else{
-        if (background == 0){
-            wait(NULL);
-        }
+    	// if the command is background then ignore SIGINT(Ctrl+C)
+        if(background == 1){
+	    	signal(SIGINT, SIG_IGN);
+	    }
+	    // if the command is not background then handle SIGINT(Ctrl+C)
+	    else{
+	    	signal(SIGINT, sig_handler);
+	    	waitpid(parent,NULL,0);
+	    }
     }
-    
 }
 
+/*
+ * Name: execute_command
+ *
+ * Description: Initiates pipes and then execute muliple commands recursively.
+ *
+ */
 void execute_command(Pgm *command, int background,char *rstdout,char *rstdin){
+    
     char **cmd = command->pgmlist;
     int pfd[2];
-    int status;
     pid_t child_pid;
     pipe(pfd);
-    child_pid = fork();
     
-    if (child_pid < 0){
-        perror("unsuccesful forking");
-    }
-    // Child Process
-    else if (child_pid == 0) {
-        close(pfd[0]);
-        dup2(pfd[1], STDOUT_FILENO);
-        close(pfd[1]);
-        if (command->next != NULL) {
-            execute_command(command->next,background,rstdout, rstdin);
-        }
-        else{
-        	if(rstdin){
-	        	FILE *fp;
-	        	fp = freopen (rstdin, "r", stdin);
-	        	if(fp == NULL){
-	        		perror("There is no such a file or directory");
-	        		_Exit(EXIT_FAILURE);
-	        	}
-		    }
-            if(execvp(cmd[0], cmd) == -1){
+    //check if the command is a single commad and execute it
+    if(command->next == NULL){
+    	if(execvp(cmd[0], cmd) == -1){
                 printf("-lsh: %s : R U kidding?? \n", *cmd);
                 _Exit(EXIT_FAILURE);
-            }
         }
     }
-    else{  // Parent Process
-        if (background == 0) {
-            close(pfd[1]);
-            dup2(pfd[0], STDIN_FILENO);
-            close(pfd[0]);
-        	if(rstdout){
-	        	FILE *fp;
-	        	fp = freopen (rstdout, "w", stdout);
-	        	if(fp == NULL){
-	        		perror("Could not create file");
-	        		_Exit(EXIT_FAILURE);
-	        	}
-	        	// fclose(fp);
-	    	}
 
+    // Execute multiple commands by recursion 
+    else{
+	    child_pid = fork();
+	    if (child_pid < 0){
+	        perror("unsuccesful forking");
+	    }
+	    // Child Process
+	    else if (child_pid == 0) {
+	        close(pfd[0]);
+	        dup2(pfd[1], STDOUT_FILENO);
+	        close(pfd[1]);
+	        
+	        // Check if recursion is required
+	        if (command->next != NULL) {
+	            execute_command(command->next,background,rstdout, rstdin);
+	        }
+	        // Execute a command and error if it is invalid command
+	        else{
+	            if(execvp(cmd[0], cmd) == -1){
+	                printf("-lsh: %s : R U kidding?? \n", *cmd);
+	                _Exit(EXIT_FAILURE);
+	            }
+	        }
+	    }
+	    // Parent Process
+	    else{
+	        if(background == 0) {
+	            close(pfd[1]);
+	            dup2(pfd[0], STDIN_FILENO);
+	            close(pfd[0]);
+	            waitpid(child_pid,NULL,0);
+	            
+	        }
+	        // Execute a command and error if it is invalid command
+	        if(execvp(cmd[0], cmd) == -1){
+	            printf("-lsh: %s : R U kidding?? \n", *cmd);
+	            _Exit(EXIT_FAILURE);
+	        }
 
-            if(execvp(cmd[0], cmd) == -1){
-                printf("-lsh: %s : R U kidding?? \n", *cmd);
-                _Exit(EXIT_FAILURE);
-            }
-//            waitpid(child_pid,NULL,0);
-        }else{
-
-        }
+	    }
+    	
     }
 }
 
-int redirectIO(char *stdout,char *stdin){
-	return 0;
+/*
+ * Name: sig_handler
+ *
+ * Description: Handle the recived signals such as SIGINT(Ctrl+c) and SIGCHLD(zombie processes)
+ */
+void sig_handler(int recievedSignal){
+    switch(recievedSignal){
+        case SIGINT:
+            // Kill all the processes except than the main process
+            if(getpid() != mainParent){
+            	kill(getpid(), SIGKILL);
+            }
+            break;
+        case SIGCHLD:
+            // Reap zombie processes
+            while (waitpid((pid_t)(-1), 0, WNOHANG) > 0) {}
+            break;
+    }
 }
